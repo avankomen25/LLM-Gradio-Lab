@@ -1,71 +1,101 @@
+"""Pirate-themed command-line chat agent backed by the Groq LLM API.
+
+Run ``python chat.py`` (or the ``chat`` entry-point after installation) to
+start an interactive REPL.  Type ``/tool arg1 arg2`` to invoke a tool
+directly without an LLM round-trip.
+"""
+
 import json
-import os
+
 from groq import Groq
-from tools.calculate import calculate, tool_schema
-
-
 from dotenv import load_dotenv
+
+from tools.calculate import calculate, tool_schema as calculate_schema
+from tools.cat import cat, tool_schema as cat_schema
+from tools.grep import grep, tool_schema as grep_schema
+from tools.ls import ls, tool_schema as ls_schema
+
 load_dotenv()
 
-class Chat:
-    '''
-    >>> chat = Chat()
-    >>> chat.send_message('my name is bob', temperature=0.0)
-    'Arrr, ye be Bob, eh? Yer name be known to me now, matey.'
-    >>> chat.send_message('what is my name?', temperature=0.0)
-    "Ye be askin' about yer own name, eh? Yer name be... Bob, matey!"
+tool_schema = [calculate_schema, ls_schema, cat_schema, grep_schema]
 
-    >>> chat2 = Chat()
-    >>> chat2.send_message('what is my name?', temperature=0.0)
-    "Arrr, I be not aware o' yer name, matey."
-    '''
+available_functions = {
+    "calculate": calculate,
+    "ls": ls,
+    "cat": cat,
+    "grep": grep,
+}
+
+_SYSTEM_PROMPT = (
+    "Write the output in 1-2 sentences. Talk like a pirate. "
+    "Always use tools to complete tasks when appropriate — never say you "
+    "cannot do something if a tool exists for it. "
+    "If the user gives you information, remember it for the rest of the conversation."
+)
+
+
+class Chat:
+    """A stateful conversational agent that maintains message history.
+
+    Each instance tracks its own conversation so multiple ``Chat`` objects
+    are fully independent.
+
+    Unit tests (no API calls — Groq is patched out):
+
+    >>> import unittest.mock
+    >>> with unittest.mock.patch('chat.Groq'):
+    ...     c = Chat()
+    >>> c.messages[0]['role']
+    'system'
+    >>> len(c.messages)
+    1
+    >>> c.messages[0]['content'] == _SYSTEM_PROMPT
+    True
+    """
+
     def __init__(self):
+        """Initialise the Groq client and seed the conversation with the system prompt."""
+        self.client = Groq()
         self.MODEL = "openai/gpt-oss-120b"
-        self.messages = [
-                {
-                    "role": "system",
-                    "content": "Write the output in 1-2 sentences. Talk like pirate. Always use tools to complete tasks when appropriate. If user gives you information, remember it for the rest of the conversation."
-                },
-            ]
+        self.messages = [{"role": "system", "content": _SYSTEM_PROMPT}]
 
     def send_message(self, message, temperature=0.0):
+        """Append *message* to history, call the LLM, execute any tool calls, and return the reply.
+
+        If the model requests a ``cat`` tool call the raw file contents are
+        returned directly (no pirate rephrasing).  All other tool results are
+        fed back to the model for a final natural-language response.
+
+        This method makes live API calls and is therefore tested via
+        integration tests rather than unit doctests.
+        """
         self.messages.append({'role': 'user', 'content': message})
-        
-        tools = [tool_schema] 
 
         chat_completion = self.client.chat.completions.create(
             messages=self.messages,
-            #model="llama-3.1-8b-instant",
             model=self.MODEL,
             temperature=temperature,
             seed=0,
-            tools=tools,
+            tools=tool_schema,
             tool_choice="auto",
         )
         response_message = chat_completion.choices[0].message
         tool_calls = response_message.tool_calls
 
-        # Step 2: Check if the model wants to call tools
         if tool_calls:
-            # Map function names to implementations
-            available_functions = {
-                "calculate": calculate,
-            }
-
-            # Add the assistant's response to conversation
             self.messages.append(response_message)
 
-            # Step 3: Execute each tool call
+            raw_output = None
             for tool_call in tool_calls:
                 function_name = tool_call.function.name
                 function_to_call = available_functions[function_name]
                 function_args = json.loads(tool_call.function.arguments)
-                function_response = function_to_call(
-                    expression=function_args.get("expression")
-                )
+                function_response = function_to_call(**function_args)
                 print(f"[tool] function_name={function_name}, function_args={function_args}")
 
-                # Add tool response to conversation
+                if function_name == "cat":
+                    raw_output = function_response
+
                 self.messages.append({
                     "tool_call_id": tool_call.id,
                     "role": "tool",
@@ -73,27 +103,33 @@ class Chat:
                     "content": function_response,
                 })
 
-            # Step 4: Get final response from model
+            if raw_output is not None:
+                self.messages.append({'role': 'assistant', 'content': raw_output})
+                return raw_output
+
             second_response = self.client.chat.completions.create(
                 model=self.MODEL,
                 messages=self.messages,
             )
             result = second_response.choices[0].message.content
-            self.messages.append({
-                'role': 'assistant',
-                'content': result
-            })
-            return second_response.choices[0].message.content
-        
-        else:
-            result = chat_completion.choices[0].message.content
-            self.messages.append({
-                'role': 'assistant',
-                'content': result })
+            self.messages.append({'role': 'assistant', 'content': result})
+            return result
+
+        result = chat_completion.choices[0].message.content
+        self.messages.append({'role': 'assistant', 'content': result})
         return result
 
+
 def repl(temperature=0.0):
-    '''
+    """Run an interactive read-eval-print loop.
+
+    Lines that start with ``/`` are treated as direct tool invocations and
+    bypass the LLM entirely.  The tool output is printed immediately and
+    added to the conversation history so the model has context for follow-up
+    questions.
+
+    Test normal LLM messages (send_message is mocked so no API call is made):
+
     >>> def monkey_input(prompt, user_inputs=['Hello, I am monkey.', 'Goodbye.']):
     ...     try:
     ...         user_input = user_inputs.pop(0)
@@ -101,30 +137,61 @@ def repl(temperature=0.0):
     ...         return user_input
     ...     except IndexError:
     ...         raise KeyboardInterrupt
-    >>> import builtins
+    >>> import builtins, unittest.mock
     >>> builtins.input = monkey_input
     >>> import chat
-    >>> chat.Chat.send_message = lambda self, msg: (
-    ...     "Arrr, a sneaky little monkey, eh? Ye be swingin' into our conversation, matey."
+    >>> chat.Chat.send_message = lambda self, msg, **kwargs: (
+    ...     "Arrr, a sneaky little monkey!"
     ...     if msg == "Hello, I am monkey." else
-    ...     "Farewell, little monkey, may the winds o' fortune blow in yer favor."
+    ...     "Farewell, little monkey."
     ... )
     >>> repl()
     chat> Hello, I am monkey.
-    Arrr, a sneaky little monkey, eh? Ye be swingin' into our conversation, matey.
+    Arrr, a sneaky little monkey!
     chat> Goodbye.
-    Farewell, little monkey, may the winds o' fortune blow in yer favor.
+    Farewell, little monkey.
     <BLANKLINE>
-    '''
-    import readline
+
+    Test manual slash command — /ls tools runs the tool directly, no LLM call:
+
+    >>> def monkey_input2(prompt, user_inputs=['/ls tools', 'Goodbye.']):
+    ...     try:
+    ...         user_input = user_inputs.pop(0)
+    ...         print(f'{prompt}{user_input}')
+    ...         return user_input
+    ...     except IndexError:
+    ...         raise KeyboardInterrupt
+    >>> builtins.input = monkey_input2
+    >>> chat.Chat.send_message = lambda self, msg, **kwargs: "Farewell."
+    >>> repl()
+    chat> /ls tools
+    __init__.py calculate.py cat.py grep.py ls.py utils.py
+    chat> Goodbye.
+    Farewell.
+    <BLANKLINE>
+    """
+    import readline  # noqa: F401 — enables arrow-key history on supported platforms
     chat = Chat()
     try:
         while True:
             user_input = input('chat> ')
-            response = chat.send_message(user_input)
-            print(response)
+            if user_input.startswith('/'):
+                parts = user_input[1:].split()
+                command = parts[0]
+                args = parts[1:]
+                if command in available_functions:
+                    result = available_functions[command](*args)
+                    print(result)
+                    chat.messages.append({'role': 'user', 'content': user_input})
+                    chat.messages.append({'role': 'assistant', 'content': result})
+                else:
+                    print(f"Unknown command: /{command}")
+            else:
+                response = chat.send_message(user_input)
+                print(response)
     except (KeyboardInterrupt, EOFError):
         print()
+
 
 if __name__ == '__main__':
     repl()

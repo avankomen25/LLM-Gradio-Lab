@@ -1,32 +1,54 @@
-#Step1: create function with right number of args, write docstring 
-#step2: create the doctests for the function 
-#Step3: get the function to pass the doctests
-#may have to modify doctests to get them to pass 
+"""Tool: list the contents of a directory, like the shell ``ls`` command."""
 
 import glob
-def ls(folder=None):
-    '''
-    This function behaves just like the ls program in the shell.
-    >>> ls()
-    'chat.py htmlcov __pycache__ requirements.txt tools venv'
 
-    >>> ls('tools')
-    'ls.py'
-    '''
+from tools.utils import is_path_safe
+
+
+tool_schema = {
+    "type": "function",
+    "function": {
+        "name": "ls",
+        "description": "List files in a directory, like the shell ls command",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "folder": {
+                    "type": "string",
+                    "description": "The folder to list. If omitted, lists the current directory.",
+                }
+            },
+            "required": [],
+        },
+    },
+}
+
+
+def ls(folder=None):
+    """Return a space-separated list of names inside *folder* (or the current directory).
+
+    Blocks absolute paths and directory traversal when *folder* is given.
+    Results are sorted alphabetically so the output is deterministic.
+
+    >>> 'chat.py' in ls()
+    True
+    >>> 'ls.py' in ls('tools')
+    True
+    >>> ls('/etc')
+    "Error: path '/etc' is not allowed"
+    >>> ls('../..')
+    "Error: path '../..' is not allowed"
+    """
+    if folder is not None and not is_path_safe(folder):
+        return f"Error: path '{folder}' is not allowed"
+
     if folder:
-        result = ''
-        #folder + '/*/==> tools/*
-        # glob is nondeterministic (no guarentee of glbo results, convert it to deterministic
-        #in a llm we did that by determining temperature, best way to make a list deterministic is to sort it)
-        for path in sorted(glob.glob(folder + '/*')):
-            result += path + ' '
-        return result
+        names = [
+            p.split('/')[-1]
+            for p in sorted(glob.glob(folder + '/*'))
+            if p.split('/')[-1] != '__pycache__'
+        ]
     else:
-        result = ''
-        for path in sorted(glob.glob('*')):
-            result += path + ' '
-        return result.strip()
-    #handle this case 
-   
- 
-  
+        names = [p for p in sorted(glob.glob('*')) if p != '__pycache__']
+
+    return ' '.join(names)
