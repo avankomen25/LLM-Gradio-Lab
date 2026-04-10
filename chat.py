@@ -1,7 +1,7 @@
 import json
 import os
 from groq import Groq
-from docsum.tools.calculate import calculate, tool_schema
+from tools.calculate import calculate, tool_schema
 
 
 from dotenv import load_dotenv
