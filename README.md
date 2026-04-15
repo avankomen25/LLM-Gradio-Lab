@@ -36,6 +36,8 @@ chat
 
 ### Direct conversation
 
+The agent remembers information across messages in the same session, so you can refer back to things you said earlier.
+
 ```
 chat> my name is Alice
 Arrr, pleasure to meet ye, Alice!
@@ -45,7 +47,9 @@ Yer name be Alice, savvy?
 
 ### Slash commands (tool call without LLM round-trip)
 
-Prefix any tool name with `/` to run it directly and add the result to context:
+Prefix any tool name with `/` to run it directly and add the result to context.
+
+Running `/ls` first lets the model answer follow-up questions about the directory instantly, without making a second API call.
 
 ```
 chat> /ls tools
@@ -54,10 +58,14 @@ chat> what files are in the tools folder?
 There be six files in the tools folder, matey.
 ```
 
+Using `/calculate` guarantees exact arithmetic results because it evaluates the expression in Python rather than relying on the model to do mental math.
+
 ```
 chat> /calculate 99 * 99
 {"result": 9801}
 ```
+
+Using `/grep` lets you search your codebase with a regex and feed the matches directly into the conversation so the model can reason about the results.
 
 ```
 chat> /grep ^def tools/*.py
@@ -67,6 +75,8 @@ tools/grep.py:def grep(pattern, path):
 tools/ls.py:def ls(folder=None):
 tools/utils.py:def is_path_safe(path):
 ```
+
+Using `/cat` returns the raw file contents without any pirate rephrasing, so you always see the exact text of the file.
 
 ```
 chat> /cat tools/calculate.py
