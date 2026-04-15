@@ -9,6 +9,10 @@ A pirate-themed command-line chat agent powered by Groq's LLM API. The agent
 can answer questions, remember conversational context, and call built-in tools
 (`calculate`, `cat`, `grep`, `ls`) either automatically or via `/slash` commands.
 
+## Demo
+![demo](demo.gif)
+
+
 ## Installation
 
 ```
