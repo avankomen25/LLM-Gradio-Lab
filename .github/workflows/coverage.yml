@@ -20,13 +20,11 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        working-directory: docsum
         run: |
           python -m pip install --upgrade pip
           pip install groq python-dotenv coverage
 
       - name: Run doctests with coverage
-        working-directory: docsum
         run: |
           coverage run -m doctest chat.py tools/utils.py tools/calculate.py tools/cat.py tools/grep.py tools/ls.py
           coverage xml
@@ -34,5 +32,5 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: docsum/coverage.xml
+          files: coverage.xml
           token: ${{ secrets.CODECOV_TOKEN }}
