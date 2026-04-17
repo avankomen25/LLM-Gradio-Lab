@@ -6,7 +6,10 @@ single response and exit.  Use ``--debug`` to see tool calls as they happen.
 """
 
 import argparse
+import glob as _glob
 import json
+import os
+import readline
 
 from groq import Groq
 from dotenv import load_dotenv
@@ -177,6 +180,53 @@ class Chat:
         return result
 
 
+def _make_completer():
+    """Return a readline completer that handles /command and filename tab completion.
+
+    Typing ``/`` + partial command name and pressing Tab completes the command.
+    Typing a partial filename in the argument position completes against the
+    filesystem.
+
+    >>> completer = _make_completer()
+    >>> callable(completer)
+    True
+
+    Command completion — /c matches /calculate, /cat, and /compact:
+
+    >>> import unittest.mock
+    >>> with unittest.mock.patch('chat.readline') as mock_rl:
+    ...     mock_rl.get_line_buffer.return_value = '/c'
+    ...     results = [completer('/c', i) for i in range(3)]
+    >>> sorted(r for r in results if r is not None)
+    ['/calculate', '/cat', '/compact']
+
+    No completions returned when the input is not a slash command:
+
+    >>> with unittest.mock.patch('chat.readline') as mock_rl:
+    ...     mock_rl.get_line_buffer.return_value = 'hello'
+    ...     completer('hello', 0) is None
+    True
+    """
+    _slash_commands = sorted(['/' + c for c in list(available_functions) + ['compact']])
+
+    def completer(text, state):
+        line = readline.get_line_buffer()
+        if not line.startswith('/'):
+            return None
+
+        if ' ' not in line:
+            # Still typing the command name — complete against slash commands
+            matches = [c for c in _slash_commands if c.startswith(text)]
+        else:
+            # In the argument position — complete against filesystem paths
+            raw = _glob.glob(text + '*')
+            matches = sorted(p + ('/' if os.path.isdir(p) else '') for p in raw)
+
+        return matches[state] if state < len(matches) else None
+
+    return completer
+
+
 def repl(debug=False, temperature=0.0):
     """Run an interactive read-eval-print loop.
 
@@ -242,8 +292,8 @@ def repl(debug=False, temperature=0.0):
     ...     except IndexError:
     ...         raise KeyboardInterrupt
     >>> builtins.input = monkey_input_compact
-    >>> with unittest.mock.patch('chat.Groq'), \
-    ...      unittest.mock.patch('chat.compact', return_value='User asked about math.') as mock_compact:
+    >>> with (unittest.mock.patch('chat.Groq'),
+    ...       unittest.mock.patch('chat.compact', return_value='User asked about math.')):
     ...     repl()
     chat> /compact
     User asked about math.
@@ -266,7 +316,13 @@ def repl(debug=False, temperature=0.0):
     debug=True
     <BLANKLINE>
     """
-    import readline  # noqa: F401 — enables arrow-key history on supported platforms
+    readline.set_completer(_make_completer())
+    readline.set_completer_delims(' \t')
+    # macOS ships libedit instead of GNU readline; the bind syntax differs
+    if 'libedit' in getattr(readline, '__doc__', ''):
+        readline.parse_and_bind('bind ^I rl_complete')
+    else:
+        readline.parse_and_bind('tab: complete')
     chat = Chat()
     try:
         while True:
