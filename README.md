@@ -27,17 +27,12 @@ Set your Groq API key so the agent can reach the LLM:
 $ export GROQ_API_KEY=your_key_here
 ```
 
-Then start the interactive REPL:
-
-```
-$ chat
-```
-
 ## Usage
 
 The agent remembers information across messages in the same session, so you can refer back to things you said earlier:
 
 ```
+$chat
 chat> my name is Alice
 Arrr, pleasure to meet ye, Alice!
 chat> what is my name?
