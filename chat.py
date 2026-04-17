@@ -332,7 +332,7 @@ def repl(debug=False, temperature=0.0):
                 command = parts[0]
                 args = parts[1:]
                 if command == 'compact':
-                    summary = compact(chat.messages)
+                    summary = compact(chat.messages, Chat())
                     print(summary)
                     chat.messages = [
                         {'role': 'system', 'content': _SYSTEM_PROMPT},
