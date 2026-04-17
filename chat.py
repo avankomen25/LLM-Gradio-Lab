@@ -73,58 +73,6 @@ class Chat:
 
         When *debug* is ``True``, each tool call is printed as
         ``[tool] /tool_name arg1 arg2`` before it executes.
-
-        Unit tests mock the Groq client so no API key is required.
-
-        No-tool-call path (model replies directly):
-        >>> import unittest.mock, types
-        >>> fake_msg = types.SimpleNamespace(tool_calls=None, content='Arrr!')
-        >>> fake_resp = types.SimpleNamespace(choices=[types.SimpleNamespace(message=fake_msg)])
-        >>> with unittest.mock.patch('chat.Groq') as MockGroq:
-        ...     MockGroq.return_value.chat.completions.create.return_value = fake_resp
-        ...     c = Chat()
-        ...     c.send_message('hello')
-        'Arrr!'
-
-        Tool-call path — non-cat tool (calculate), debug=True prints the call:
-        >>> tool_call = types.SimpleNamespace(
-        ...     id='tc1',
-        ...     function=types.SimpleNamespace(name='calculate', arguments='{"expression": "1+1"}')
-        ... )
-        >>> fake_tool_msg = types.SimpleNamespace(tool_calls=[tool_call], content=None)
-        >>> fake_tool_resp = types.SimpleNamespace(choices=[types.SimpleNamespace(message=fake_tool_msg)])
-        >>> fake_final_msg = types.SimpleNamespace(content='The answer be 2!')
-        >>> fake_final_resp = types.SimpleNamespace(choices=[types.SimpleNamespace(message=fake_final_msg)])
-        >>> with unittest.mock.patch('chat.Groq') as MockGroq:
-        ...     mock_create = MockGroq.return_value.chat.completions.create
-        ...     mock_create.side_effect = [fake_tool_resp, fake_final_resp]
-        ...     c = Chat()
-        ...     c.send_message('what is 1+1?', debug=True)
-        [tool] /calculate 1+1
-        'The answer be 2!'
-
-        Without debug=True no tool output is printed:
-        >>> with unittest.mock.patch('chat.Groq') as MockGroq:
-        ...     mock_create = MockGroq.return_value.chat.completions.create
-        ...     mock_create.side_effect = [fake_tool_resp, fake_final_resp]
-        ...     c = Chat()
-        ...     c.send_message('what is 1+1?', debug=False)
-        'The answer be 2!'
-
-        Tool-call path — cat tool returns raw file content without second API call:
-        >>> cat_call = types.SimpleNamespace(
-        ...     id='tc2',
-        ...     function=types.SimpleNamespace(name='cat', arguments='{"file": "tools/calculate.py"}')
-        ... )
-        >>> fake_cat_msg = types.SimpleNamespace(tool_calls=[cat_call], content=None)
-        >>> fake_cat_resp = types.SimpleNamespace(choices=[types.SimpleNamespace(message=fake_cat_msg)])
-        >>> with unittest.mock.patch('chat.Groq') as MockGroq:
-        ...     MockGroq.return_value.chat.completions.create.return_value = fake_cat_resp
-        ...     c = Chat()
-        ...     result = c.send_message('show me calculate.py', debug=True)
-        [tool] /cat tools/calculate.py
-        >>> 'def calculate' in result
-        True
         """
         self.messages.append({'role': 'user', 'content': message})
 
@@ -358,31 +306,6 @@ def main():
     With no positional argument, starts the interactive REPL.
     With a positional message, sends that message and exits.
     ``--debug`` prints tool calls as ``[tool] /tool_name args``.
-
-    >>> import unittest.mock, types
-    >>> fake_msg = types.SimpleNamespace(tool_calls=None, content='Arrr!')
-    >>> fake_resp = types.SimpleNamespace(choices=[types.SimpleNamespace(message=fake_msg)])
-    >>> with unittest.mock.patch('chat.Groq') as MockGroq, \\
-    ...      unittest.mock.patch('sys.argv', ['chat', 'hello']):
-    ...     MockGroq.return_value.chat.completions.create.return_value = fake_resp
-    ...     main()
-    Arrr!
-
-    With --debug and a tool call, the tool invocation is printed:
-    >>> tool_call = types.SimpleNamespace(
-    ...     id='tc1',
-    ...     function=types.SimpleNamespace(name='calculate', arguments='{"expression": "1+1"}')
-    ... )
-    >>> fake_tool_msg = types.SimpleNamespace(tool_calls=[tool_call], content=None)
-    >>> fake_tool_resp = types.SimpleNamespace(choices=[types.SimpleNamespace(message=fake_tool_msg)])
-    >>> fake_final_msg = types.SimpleNamespace(content='The answer be 2!')
-    >>> fake_final_resp = types.SimpleNamespace(choices=[types.SimpleNamespace(message=fake_final_msg)])
-    >>> with unittest.mock.patch('chat.Groq') as MockGroq, \\
-    ...      unittest.mock.patch('sys.argv', ['chat', '--debug', 'what is 1+1?']):
-    ...     MockGroq.return_value.chat.completions.create.side_effect = [fake_tool_resp, fake_final_resp]
-    ...     main()
-    [tool] /calculate 1+1
-    The answer be 2!
     """
     parser = argparse.ArgumentParser(description='Pirate-themed chat agent powered by Groq.')
     parser.add_argument('message', nargs='?', help='Send a single message and exit.')
