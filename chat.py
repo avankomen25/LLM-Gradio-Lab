@@ -7,7 +7,6 @@ single response and exit.  Use ``--debug`` to see tool calls as they happen.
 
 import argparse
 import json
-import sys
 
 from groq import Groq
 from dotenv import load_dotenv
