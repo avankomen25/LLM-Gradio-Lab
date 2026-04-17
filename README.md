@@ -10,33 +10,32 @@ A pirate-themed command-line chat agent powered by Groq's LLM API. The agent
 can answer questions, remember conversational context, and call built-in tools
 (`calculate`, `cat`, `grep`, `ls`) either automatically or via `/slash` commands.
 
-## Demo
 ![demo](demo.gif)
 
 
 ## Installation
 
-```
-pip install cmc-csci040-sophiazheng
-```
-
-Set your Groq API key:
+Install the package from PyPI:
 
 ```
-export GROQ_API_KEY=your_key_here
+$ pip install cmc-csci040-sophiazheng
 ```
 
-Then start the REPL:
+Set your Groq API key so the agent can reach the LLM:
 
 ```
-chat
+$ export GROQ_API_KEY=your_key_here
+```
+
+Then start the interactive REPL:
+
+```
+$ chat
 ```
 
 ## Usage
 
-### Direct conversation
-
-The agent remembers information across messages in the same session, so you can refer back to things you said earlier.
+The agent remembers information across messages in the same session, so you can refer back to things you said earlier:
 
 ```
 chat> my name is Alice
