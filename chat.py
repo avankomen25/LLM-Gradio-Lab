@@ -242,7 +242,7 @@ def repl(debug=False, temperature=0.0):
     >>> with unittest.mock.patch('chat.Groq'):
     ...     repl()
     chat> /ls tools
-    __init__.py calculate.py cat.py compact.py grep.py ls.py utils.py
+    __init__.py calculate.py cat.py compact.py doctests.py grep.py ls.py rm.py utils.py write_file.py
     chat> Goodbye.
     Farewell.
     <BLANKLINE>
