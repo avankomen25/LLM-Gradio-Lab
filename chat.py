@@ -78,7 +78,7 @@ class Chat:
     def __init__(self):
         """Initialise the Groq client and seed the conversation with the system prompt."""
         self.client = Groq()
-        self.MODEL = "llama-3.3-70b-versatile"
+        self.MODEL = "openai/gpt-oss-120b"
         self.messages = [{"role": "system", "content": _SYSTEM_PROMPT}]
 
     def send_message(self, message, temperature=0.0, debug=False):
